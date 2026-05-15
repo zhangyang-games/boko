@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-BOKO - AI 读书老师后端  v1.1
-新增：Basic Auth 登录保护 / 原文查看接口
+BOKO - AI 读书老师后端  v1.2
+认证改为 session cookie，解决 Safari 兼容问题
 """
 
-import os, json, sqlite3, time, hashlib, base64, secrets
+import os, json, sqlite3, time, hashlib, secrets
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
@@ -22,29 +21,22 @@ BOOKS_DIR = DATA_DIR / "books"
 DB_PATH   = DATA_DIR / "boko.db"
 BOOKS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Basic Auth ────────────────────────────────────────────────────
+# ── Session 认证 ──────────────────────────────────────────────────
 BOKO_USER = os.environ.get("BOKO_USER", "")
 BOKO_PASS = os.environ.get("BOKO_PASS", "")
+SESSIONS: dict[str, float] = {}   # token -> expire_time
+SESSION_TTL = 60 * 60 * 24 * 7    # 7天
+
+def make_token() -> str:
+    return secrets.token_hex(32)
 
 def check_auth(request: Request):
     if not BOKO_USER or not BOKO_PASS:
-        return
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Basic "):
-        raise HTTPException(
-            status_code=401, detail="请登录",
-            headers={"WWW-Authenticate": 'Basic realm="BOKO"'},
-        )
-    try:
-        decoded = base64.b64decode(auth[6:]).decode("utf-8")
-        username, password = decoded.split(":", 1)
-    except Exception:
-        raise HTTPException(status_code=401, detail="认证格式错误",
-                            headers={"WWW-Authenticate": 'Basic realm="BOKO"'})
-    if not (secrets.compare_digest(username, BOKO_USER) and
-            secrets.compare_digest(password, BOKO_PASS)):
-        raise HTTPException(status_code=401, detail="用户名或密码错误",
-                            headers={"WWW-Authenticate": 'Basic realm="BOKO"'})
+        return   # 未配置则不鉴权
+    token = request.cookies.get("boko_session", "")
+    if token and SESSIONS.get(token, 0) > time.time():
+        return   # 有效 session
+    raise HTTPException(status_code=401, detail="请先登录")
 
 AUTH = [Depends(check_auth)]
 
@@ -116,7 +108,7 @@ def parse_pdf(path):
             if len(buf) > 2000 or i == len(reader.pages) - 1:
                 chunks.append({"title": f"第 {len(chunks)+1} 段", "content": buf.strip()})
                 buf = ""
-        return chunks or [{"title": "全文", "content": "（无法提取文本，可能是扫描版）"}]
+        return chunks or [{"title": "全文", "content": "（无法提取文本）"}]
     except Exception as e:
         return [{"title": "解析失败", "content": f"PDF 解析出错：{e}"}]
 
@@ -149,7 +141,7 @@ def parse_book(path):
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
         return [{"title": f"第 {i//2000+1} 段", "content": text[i:i+2000]}
-                for i in range(0, max(len(text),1), 2000)]
+                for i in range(0, max(len(text), 1), 2000)]
     except:
         return [{"title": "全文", "content": "（无法读取文件）"}]
 
@@ -187,11 +179,100 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="BOKO", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
+                   allow_headers=["*"], allow_credentials=True)
 
-# ── 页面 ──────────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse, dependencies=AUTH)
-async def index():
+# ── 登录页 & 认证接口 ─────────────────────────────────────────────
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOKO · 登录</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Noto Serif SC',serif;background:#f5f0e8;
+  min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:20px;padding:48px 40px;width:360px;
+  box-shadow:0 8px 40px rgba(60,40,20,.12);text-align:center}
+.logo{font-size:42px;letter-spacing:.1em;color:#b85c2c;font-weight:700;margin-bottom:6px}
+.sub{font-size:13px;color:#9c8e7e;margin-bottom:36px}
+.field{width:100%;padding:12px 16px;border:1px solid #e0d8c8;border-radius:10px;
+  font-size:15px;font-family:inherit;background:#f5f0e8;outline:none;
+  transition:border-color .15s;margin-bottom:14px}
+.field:focus{border-color:#b85c2c}
+.btn{width:100%;padding:13px;background:#b85c2c;color:#fff;border:none;
+  border-radius:10px;font-size:15px;font-family:inherit;cursor:pointer;
+  transition:background .15s;letter-spacing:.05em}
+.btn:hover{background:#a04e24}
+.err{color:#c0392b;font-size:13px;margin-top:12px;min-height:20px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">BOKO</div>
+  <div class="sub">📖 AI 读书老师</div>
+  <input class="field" type="text" id="u" placeholder="用户名" autocomplete="username">
+  <input class="field" type="password" id="p" placeholder="密码" autocomplete="current-password"
+         onkeydown="if(event.key==='Enter')login()">
+  <button class="btn" onclick="login()">进入书房</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+async function login(){
+  const u=document.getElementById('u').value.trim()
+  const p=document.getElementById('p').value
+  if(!u||!p){document.getElementById('err').textContent='请填写用户名和密码';return}
+  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:u,password:p}),credentials:'include'})
+  if(r.ok){location.href='/'}
+  else{const d=await r.json();document.getElementById('err').textContent=d.detail||'登录失败'}
+}
+document.getElementById('u').focus()
+</script>
+</body>
+</html>"""
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    return HTMLResponse(LOGIN_HTML)
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+async def do_login(req: LoginRequest, response: Response):
+    if not BOKO_USER or not BOKO_PASS:
+        # 未配置认证，直接给 token
+        token = make_token()
+        SESSIONS[token] = time.time() + SESSION_TTL
+        response.set_cookie("boko_session", token, max_age=SESSION_TTL,
+                            httponly=True, samesite="lax")
+        return {"ok": True}
+    if req.username != BOKO_USER or req.password != BOKO_PASS:
+        raise HTTPException(401, "用户名或密码错误")
+    token = make_token()
+    SESSIONS[token] = time.time() + SESSION_TTL
+    response.set_cookie("boko_session", token, max_age=SESSION_TTL,
+                        httponly=True, samesite="lax")
+    return {"ok": True}
+
+@app.post("/api/logout")
+async def do_logout(request: Request, response: Response):
+    token = request.cookies.get("boko_session", "")
+    SESSIONS.pop(token, None)
+    response.delete_cookie("boko_session")
+    return {"ok": True}
+
+# ── 主页（需登录）────────────────────────────────────────────────
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    # 未登录时跳转到登录页
+    if BOKO_USER and BOKO_PASS:
+        token = request.cookies.get("boko_session", "")
+        if not token or SESSIONS.get(token, 0) <= time.time():
+            return RedirectResponse("/login")
     return HTMLResponse((Path(__file__).parent / "index.html").read_text(encoding="utf-8"))
 
 # ── 书籍 API ──────────────────────────────────────────────────────
@@ -251,15 +332,13 @@ async def get_chunks(book_id: str):
 
 @app.get("/api/books/{book_id}/chunks/{chunk_idx}/content", dependencies=AUTH)
 async def get_chunk_content(book_id: str, chunk_idx: int):
-    """返回某章节完整原文"""
     conn = get_db()
     row  = conn.execute(
         "SELECT title, content FROM chunks WHERE book_id=? AND idx=?",
         (book_id, chunk_idx)
     ).fetchone()
     conn.close()
-    if not row:
-        raise HTTPException(404, "章节不存在")
+    if not row: raise HTTPException(404, "章节不存在")
     return {"title": row["title"], "content": row["content"]}
 
 # ── 聊天 API ──────────────────────────────────────────────────────
@@ -351,7 +430,7 @@ async def set_config(cfg: ConfigSet):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "name": "BOKO", "version": "1.1"}
+    return {"status": "ok", "name": "BOKO", "version": "1.2"}
 
 if __name__ == "__main__":
     import uvicorn
