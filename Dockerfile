@@ -2,18 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装系统依赖（ebooklib 需要 libxml2）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev libxslt-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server.py .
 COPY index.html .
+# logo.png 如果存在就复制（用 shell 判断，不存在也不报错）
+RUN mkdir -p /app
+COPY . .
 
 EXPOSE 7860
-
 CMD ["python", "server.py"]

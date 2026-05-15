@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BOKO · AI 读书老师</title>
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=ZCOOL+XiaoWei&family=DM+Mono:ital@0;1&display=swap" rel="stylesheet">
 <style>
@@ -583,8 +585,13 @@ main {
 
 <header>
   <div class="logo">
-    <div class="logo-dot"></div>
-    BOKO
+    <img src="/logo.png" alt="BOKO" id="logo-img"
+         style="height:36px;width:auto;object-fit:contain;display:block"
+         onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'">
+    <div id="logo-fallback" style="display:none;align-items:center;gap:8px">
+      <div class="logo-dot"></div>
+      BOKO
+    </div>
     <span style="font-size:13px;color:var(--ink3);font-family:'DM Mono',monospace;margin-left:6px">读书老师</span>
   </div>
   <div class="header-actions">

@@ -428,6 +428,17 @@ async def set_config(cfg: ConfigSet):
     if cfg.model: os.environ["AI_MODEL"] = cfg.model
     return {"ok": True}
 
+@app.get("/logo.png")
+async def serve_logo():
+    """提供 logo 图片"""
+    from fastapi.responses import FileResponse
+    logo_path = Path(__file__).parent / "logo.png"
+    if not logo_path.exists():
+        # logo 不存在时返回 404，前端会自动降级显示文字
+        raise HTTPException(404, "logo not found")
+    return FileResponse(str(logo_path), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "name": "BOKO", "version": "1.2"}
