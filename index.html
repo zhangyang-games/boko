@@ -455,16 +455,117 @@ main {
   margin-top: 6px;
 }
 
-/* ── 响应式 ── */
+/* ── 响应式 · 手机端 ── */
 @media (max-width: 700px) {
-  main { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
+  header { padding: 10px 16px; }
+  .logo { font-size: 22px; }
+  #cfg-badge { display: none; }
+
+  main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    padding-bottom: 64px; /* 给底部tab留空间 */
+  }
+
+  /* 手机上sidebar和reader都铺满，靠tab切换显示 */
+  .sidebar {
+    position: fixed;
+    inset: 56px 0 64px 0;
+    z-index: 50;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    transition: transform .25s ease;
+  }
+  .sidebar.hidden-mobile { transform: translateX(-100%); display: flex !important; }
+
+  .reader {
+    position: fixed;
+    inset: 56px 0 64px 0;
+    transition: transform .25s ease;
+  }
+  .reader.hidden-mobile { transform: translateX(100%); }
+
+  /* 底部Tab栏 */
+  .mobile-tab-bar {
+    display: flex;
+  }
+
+  /* 上传区手机适配 */
+  .upload-area { margin: 8px 10px; padding: 12px; }
+  .welcome { padding: 30px 20px; }
+  .welcome-title { font-size: 26px; }
+  .welcome-steps { flex-direction: column; gap: 10px; }
+  .step { width: 100%; flex-direction: row; gap: 12px; padding: 14px 16px; }
+
+  /* 聊天区手机适配 */
+  .chunk-bar { padding: 8px 12px; }
+  .chat-area { padding: 14px; gap: 14px; }
+  .msg-bubble { font-size: 14px; max-width: 85vw; }
+  .chat-input-wrap { padding: 10px 12px; }
+  .quick-btns { gap: 6px; }
+  .quick-btn { font-size: 11px; padding: 4px 10px; }
+  .book-reader-head { padding: 12px 16px; }
+}
+
+@media (min-width: 701px) {
+  .mobile-tab-bar { display: none; }
 }
 
 /* 滚动条美化 */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--paper3); border-radius: 2px; }
+
+/* 底部Tab栏 */
+.mobile-tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 64px;
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  display: none;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 10px;
+  transition: background .15s;
+  color: var(--ink3);
+  font-family: 'Noto Serif SC', serif;
+}
+.tab-btn.active { color: var(--accent); }
+.tab-btn .tab-icon { font-size: 22px; line-height: 1; }
+.tab-btn .tab-label { font-size: 10px; letter-spacing: 0.05em; }
+.tab-upload-btn {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(184,92,44,.35);
+  transition: transform .15s;
+  flex-shrink: 0;
+}
+.tab-upload-btn:active { transform: scale(.93); }
 
 /* toast */
 .toast {
@@ -585,6 +686,22 @@ main {
   </section>
 </main>
 
+<!-- 手机底部Tab栏 -->
+<nav class="mobile-tab-bar">
+  <button class="tab-btn active" id="tab-shelf" onclick="switchTab('shelf')">
+    <span class="tab-icon">📚</span>
+    <span class="tab-label">书架</span>
+  </button>
+  <button class="tab-upload-btn" onclick="document.getElementById('file-input-mobile').click()" title="上传书籍">
+    ＋
+    <input type="file" id="file-input-mobile" accept=".pdf,.epub,.txt" style="display:none" onchange="handleFileSelect(event)">
+  </button>
+  <button class="tab-btn" id="tab-read" onclick="switchTab('read')">
+    <span class="tab-icon">💬</span>
+    <span class="tab-label">阅读</span>
+  </button>
+</nav>
+
 <!-- 原文弹窗 -->
 <div class="modal-overlay" id="orig-modal">
   <div class="modal" style="max-width:680px;max-height:80vh;display:flex;flex-direction:column">
@@ -635,6 +752,33 @@ main {
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 手机Tab切换 ───────────────────────────────────────────────────────
+let currentTab = 'shelf'
+function switchTab(tab) {
+  currentTab = tab
+  const sidebar  = document.querySelector('.sidebar')
+  const reader   = document.getElementById('reader')
+  const tabShelf = document.getElementById('tab-shelf')
+  const tabRead  = document.getElementById('tab-read')
+  if (tab === 'shelf') {
+    sidebar.classList.remove('hidden-mobile')
+    reader.classList.add('hidden-mobile')
+    tabShelf.classList.add('active')
+    tabRead.classList.remove('active')
+  } else {
+    sidebar.classList.add('hidden-mobile')
+    reader.classList.remove('hidden-mobile')
+    tabShelf.classList.remove('active')
+    tabRead.classList.add('active')
+  }
+}
+
+// ── 退出登录 ──────────────────────────────────────────────────────────
+async function logout() {
+  await fetch('/api/logout', {method:'POST', credentials:'include'})
+  location.href = '/login'
+}
+
 // ── 状态 ─────────────────────────────────────────────────────────
 let books = []
 let currentBook = null
@@ -706,6 +850,8 @@ async function openBook(bookId) {
 
   document.getElementById('welcome-screen').style.display = 'none'
   document.getElementById('book-reader').style.display = 'flex'
+  // 手机端自动切换到阅读tab
+  if (window.innerWidth <= 700) switchTab('read')
   document.getElementById('reader-title').textContent = currentBook.title
   document.getElementById('reader-sub').textContent = `${currentBook.pages} 个章节`
   document.getElementById('chat-area').innerHTML = ''
