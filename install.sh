@@ -6,11 +6,11 @@
 # ================================================================
 
 # ── 统一配置区 ────────────────────────────────────────────────────
-readonly BOKO_PORT=7860
-readonly BOKO_DATA_DIR="/root/boko_data"
-readonly BOKO_CONTAINER="boko_app"
-readonly BOKO_IMAGE="boko:latest"
-readonly GITHUB_RAW="https://raw.githubusercontent.com/zhangyang-games/boko/main"
+BOKO_PORT=7860
+BOKO_DATA_DIR="/root/boko_data"
+BOKO_CONTAINER="boko_app"
+BOKO_IMAGE="boko:latest"
+GITHUB_RAW="https://raw.githubusercontent.com/zhangyang-games/boko/main"
 
 # ── 颜色 ─────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -118,7 +118,19 @@ install_boko() {
         exit 1
     fi
 
-    # 4. 可选：自定义模型
+    # 4. 登录账号密码
+    echo ""
+    echo -e "  ${YELLOW}设置 BOKO 登录账号（保护你的书架不被别人访问）${NC}"
+    read -p "  用户名: " BOKO_USER
+    read -s -p "  密码: " BOKO_PASS
+    echo ""
+    if [ -z "$BOKO_USER" ] || [ -z "$BOKO_PASS" ]; then
+        warn "未设置账号，BOKO 将不需要登录（不推荐）"
+        BOKO_USER=""
+        BOKO_PASS=""
+    fi
+
+    # 5. 可选：自定义模型
     echo ""
     echo -e "  ${DIM}默认模型：${AI_MODEL}（直接回车使用默认）${NC}"
     read -p "  自定义模型（留空跳过）: " CUSTOM_MODEL
@@ -132,6 +144,11 @@ install_boko() {
     echo -e "  域名    : ${GREEN}https://${BOKO_DOMAIN}${NC}"
     echo -e "  AI      : ${GREEN}${AI_PROVIDER} / ${AI_MODEL}${NC}"
     echo -e "  数据目录: ${GREEN}${BOKO_DATA_DIR}${NC}"
+    if [ -n "$BOKO_USER" ]; then
+        echo -e "  登录账号: ${GREEN}${BOKO_USER}${NC}"
+    else
+        echo -e "  登录保护: ${YELLOW}未启用${NC}"
+    fi
     echo -e "  端口    : ${GREEN}${BOKO_PORT}（仅本地，通过 Cloudflare 访问）${NC}"
     echo ""
     read -p "  确认安装？[y/N] " CONFIRM
@@ -185,6 +202,8 @@ install_boko() {
         -e "AI_BASE_URL=${AI_BASE_URL}" \
         -e "AI_MODEL=${AI_MODEL}" \
         -e "BOKO_DATA=/data" \
+        -e "BOKO_USER=${BOKO_USER}" \
+        -e "BOKO_PASS=${BOKO_PASS}" \
         "$BOKO_IMAGE"
 
     if [ $? -eq 0 ]; then
@@ -266,7 +285,7 @@ AI_PROVIDER=${AI_PROVIDER}
 AI_MODEL=${AI_MODEL}
 BOKO_PORT=${BOKO_PORT}
 BOKO_DATA_DIR=${BOKO_DATA_DIR}
-INSTALLED_AT=$(date '+%Y-%m-%d %H:%M:%S')
+INSTALLED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 EOF
     chmod 600 "$CRED_FILE"
     ok "凭证已保存到 ${CRED_FILE}"

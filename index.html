@@ -569,6 +569,7 @@ main {
           <button class="quick-btn" onclick="sendQuick('用更简单的话解释一下')">更简单一点</button>
           <button class="quick-btn" onclick="sendQuick('继续讲下去')">继续讲</button>
           <button class="quick-btn" onclick="sendQuick('这一段最重要的一句话是什么？')">一句话总结</button>
+          <button class="quick-btn" onclick="showOriginalText()" style="border-color:var(--accent2);color:var(--accent)">📄 显示原文</button>
         </div>
         <div class="chat-input-row">
           <textarea class="chat-input" id="chat-input"
@@ -582,6 +583,21 @@ main {
     </div>
   </section>
 </main>
+
+<!-- 原文弹窗 -->
+<div class="modal-overlay" id="orig-modal">
+  <div class="modal" style="max-width:680px;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 id="orig-title">原文</h2>
+      <button class="btn btn-sm btn-ghost" onclick="closeOrig()" style="font-size:18px">✕</button>
+    </div>
+    <div id="orig-content" style="overflow-y:auto;flex:1;font-size:14px;line-height:2;color:var(--ink2);white-space:pre-wrap;background:var(--paper2);border-radius:8px;padding:16px;border:1px solid var(--border)"></div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-sm" onclick="copyOrig()">复制全文</button>
+      <button class="btn btn-sm btn-accent" onclick="closeOrig()" style="margin-left:8px">关闭</button>
+    </div>
+  </div>
+</div>
 
 <!-- 配置弹窗 -->
 <div class="modal-overlay" id="config-modal">
@@ -914,7 +930,32 @@ function showToast(msg, duration=2500) {
   setTimeout(() => t.classList.remove('show'), duration)
 }
 
+// ── 原文显示 ─────────────────────────────────────────────────────────
+async function showOriginalText() {
+  if (!currentBook) return
+  document.getElementById('orig-content').textContent = '加载中…'
+  document.getElementById('orig-title').textContent = '原文加载中'
+  document.getElementById('orig-modal').classList.add('open')
+  try {
+    const r = await fetch(`/api/books/${currentBook.id}/chunks/${currentChunkIdx}/content`)
+    if (!r.ok) throw new Error('请求失败')
+    const data = await r.json()
+    document.getElementById('orig-title').textContent = `原文 · ${data.title}`
+    document.getElementById('orig-content').textContent = data.content
+  } catch(e) {
+    document.getElementById('orig-content').textContent = '加载失败：' + e.message
+  }
+}
+function closeOrig() { document.getElementById('orig-modal').classList.remove('open') }
+function copyOrig() {
+  const text = document.getElementById('orig-content').textContent
+  navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => showToast('复制失败，请手动选择'))
+}
+
 // 点击弹窗外关闭
+document.getElementById('orig-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeOrig()
+})
 document.getElementById('config-modal').addEventListener('click', function(e) {
   if (e.target === this) closeConfig()
 })
