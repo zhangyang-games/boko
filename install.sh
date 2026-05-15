@@ -176,6 +176,14 @@ install_boko() {
             exit 1
         fi
     done
+    # logo 可选，下载失败不影响安装
+    echo -ne "  下载 logo.png... "
+    if curl -fsSL "${GITHUB_RAW}/logo.png" -o "logo.png" 2>/dev/null && [ -s "logo.png" ]; then
+        echo -e "${GREEN}✔${NC}"
+    else
+        echo -e "${DIM}跳过（无 logo）${NC}"
+        rm -f logo.png
+    fi
 
     step "构建 Docker 镜像"
     info "首次构建需要 2-5 分钟，请耐心等待..."
@@ -376,6 +384,7 @@ update_boko() {
     for f in server.py index.html Dockerfile requirements.txt; do
         curl -fsSL "${GITHUB_RAW}/${f}" -o "${f}" 2>/dev/null && ok "下载 ${f}" || { err "下载 ${f} 失败"; exit 1; }
     done
+    curl -fsSL "${GITHUB_RAW}/logo.png" -o "logo.png" 2>/dev/null && [ -s "logo.png" ] && ok "下载 logo.png" || warn "无 logo，跳过"
 
     # 重新构建镜像
     docker build -t "$BOKO_IMAGE" . && ok "镜像更新成功" || { err "构建失败"; exit 1; }
