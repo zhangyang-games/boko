@@ -191,21 +191,21 @@ LOGIN_HTML = """<!DOCTYPE html>
 <title>BOKO · 登录</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'PingFang SC','Noto Serif SC',serif;background:#f5f0e8;
+body{font-family:'PingFang SC','Noto Serif SC',serif;background:#ffffff;
   min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#fff;border-radius:20px;padding:48px 40px;width:360px;
-  box-shadow:0 8px 40px rgba(60,40,20,.12);text-align:center}
-.logo{font-size:42px;letter-spacing:.1em;color:#b85c2c;font-weight:700;margin-bottom:6px}
-.sub{font-size:13px;color:#9c8e7e;margin-bottom:36px}
-.field{width:100%;padding:12px 16px;border:1px solid #e0d8c8;border-radius:10px;
-  font-size:15px;font-family:inherit;background:#f5f0e8;outline:none;
-  transition:border-color .15s;margin-bottom:14px}
-.field:focus{border-color:#b85c2c}
-.btn{width:100%;padding:13px;background:#b85c2c;color:#fff;border:none;
+.card{background:#ffffff;border-radius:20px;padding:48px 40px;width:360px;
+  box-shadow:0 8px 40px rgba(0,0,0,.12);text-align:center;border:1px solid #e0e0e0}
+.logo{font-size:42px;letter-spacing:.1em;color:#000000;font-weight:700;margin-bottom:6px}
+.sub{font-size:13px;color:#666666;margin-bottom:36px}
+.field{width:100%;padding:12px 16px;border:1px solid #e0e0e0;border-radius:10px;
+  font-size:15px;font-family:inherit;background:#f5f5f5;outline:none;
+  transition:border-color .15s;margin-bottom:14px;color:#000000}
+.field:focus{border-color:#000000}
+.btn{width:100%;padding:13px;background:#000000;color:#ffffff;border:none;
   border-radius:10px;font-size:15px;font-family:inherit;cursor:pointer;
   transition:background .15s;letter-spacing:.05em}
-.btn:hover{background:#a04e24}
-.err{color:#c0392b;font-size:13px;margin-top:12px;min-height:20px}
+.btn:hover{background:#333333}
+.err{color:#333333;font-size:13px;margin-top:12px;min-height:20px}
 </style>
 </head>
 <body>
